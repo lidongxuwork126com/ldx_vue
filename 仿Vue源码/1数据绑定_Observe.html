@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+<script>
+
+    // 1. 注册属性拦截
+    function myObjectDefinePropery(data, key, val) {
+        // 2. 如果val还是个对象, 就继续递归遍历它的所有key, 直到是基础的数据类型
+        if (val && typeof val === 'object') {
+            observe(val);
+            return;
+        }
+        // 3. 拦截对象的key的set和get方法
+        Object.defineProperty(data, key, {
+            get: function() {
+                return val;
+            },
+            set: function(newVal) {
+                console.log(key+"被改变了");
+                val = newVal;
+            }
+        });
+    }
+
+    // 4. 遍历对象所有key, 给他们绑定set/get方法
+    function observe(data) {
+        Object.keys(data).forEach(function(key) {
+            myObjectDefinePropery(data, key, data[key]);
+        });
+    }
+
+    // 5. 定义model数据
+    let model = {
+        obj: {
+            userName: ''
+        },
+        obj2: ''
+    };
+    // 6. 绑定劫持set/get方法
+    observe(model);
+
+    // 7. 触发set方法
+    model.obj.userName = '李东旭';
+    model.obj2 = '你好啊';
+    // 8. 触发get方法
+    console.log(model.obj2);
+</script>
+</body>
+</html>

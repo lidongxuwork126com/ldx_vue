@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+<script>
+    function myObjectDefinePropery(data, key, val) {
+        if (val && typeof val === 'object') {
+            observe(val);
+            return;
+        }
+        // 7. 实例化Dep类对象
+        let dep = new Dep();
+        Object.defineProperty(data, key, {
+            get: function() {
+                // 8. (Dep.target 指的是Watcher实例对象, 如果有, 则添加到订阅类中)
+                if (Dep.target){
+                    // 9. 添加Watcher到订阅类中
+                    dep.addSub(Dep.target);
+                }
+                return val;
+            },
+            set: function(newVal) {
+                // 判断set时值一样则退出
+                if (val === newVal){
+                    return;
+                }
+                val = newVal;
+                // 10. 属性发生变化, 通知订阅者, 调用所有Wathcer执行对应方法
+                dep.notify();
+            }
+        });
+    }
+    function observe(data) {
+        Object.keys(data).forEach(function(key) {
+            myObjectDefinePropery(data, key, data[key]);
+        });
+    }
+
+    // 1. 新建订阅类, 属性改变, 触发方法, 收集这些方法
+    function Dep () {
+        // 用于放置每个属性变化时应该执行的方法体
+        this.watcherArr = [];
+    }
+    Dep.prototype = {
+        // 2. 用于添加属性改变对应执行的方法
+        addSub: function(watcher){
+            this.watcherArr.push(watcher);
+        },
+        // 3. 用于通知所有watcher, 让watcher观察者执行自己对应的方法体
+        notify: function(){
+            this.watcherArr.forEach(function(watcher){
+                // 4. 观察者执行对应代码, 可以跳转到Watcher类的update方法查看
+                watcher.update();
+            })
+        }
+    };
+
+    // 5. 定义观察类, 用于监视某些属性
+    function Watcher(model, exp) {
+        // 用在Object.definePropery的get方法中, 用于保存当前观察者对象
+        Dep.target = this;
+        // 给这个model绑定数据劫持
+        observe(model);
+        // 触发Object.definePropery的get方法
+        model[exp];
+    }
+
+    // 6. 属性被修改了, 触发update方法
+    Watcher.prototype = {
+        update: function() {
+            console.log("属性更新了");
+        }
+    };
+
+
+    // 11. 实例化观察类, 让它观察这个对象
+    let model = {
+        userName: ""
+    };
+    new Watcher(model, "userName");
+
+    // 12. 修改属性值, 看update方法里代码是否执行
+    model.userName = "ok";
+</script>
+</body>
+</html>

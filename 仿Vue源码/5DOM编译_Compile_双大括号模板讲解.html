@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+<script>
+    function myObjectDefinePropery(data, key, val) {
+        if (val && typeof val === 'object') {
+            observe(val);
+            return;
+        }
+        let dep = new Dep();
+        Object.defineProperty(data, key, {
+            get: function() {
+                if (Dep.target){
+                    dep.addSub(Dep.target);
+                }
+                return val;
+            },
+            set: function(newVal) {
+                if (val === newVal){
+                    return;
+                }
+                val = newVal;
+                dep.notify();
+            }
+        });
+    }
+    function observe(data) {
+        Object.keys(data).forEach(function(key) {
+            myObjectDefinePropery(data, key, data[key]);
+        });
+    }
+    function Dep () {
+        this.watcherArr = [];
+    }
+    Dep.prototype = {
+        addSub: function(watcher){
+            this.watcherArr.push(watcher);
+        },
+        notify: function(){
+            this.watcherArr.forEach(function(watcher){
+                watcher.update();
+            })
+        }
+    };
+    function Watcher(vm, cb, exp) {
+        this.vm = vm;
+        this.cb = cb;
+        this.exp = exp;
+        this.value = this.get();
+    }
+    Watcher.prototype = {
+        update: function() {
+            let value = this.vm.data[this.exp];
+            let oldVal = this.value;
+            if (value !== oldVal) {
+                this.value = value;
+                this.cb.call(this.vm, value);
+            }
+        },
+        get: function() {
+            Dep.target = this;
+            let value = this.vm.data[this.exp];
+            Dep.target = null;
+            return value;
+        }
+    };
+
+    // 1. 创建类Compile, (用于解析DOM节点), 接收根DOM和vue实例对象
+    function Compile(el, vm) {
+        this.vm = vm; // vue实例
+        this.el = document.querySelector(el); // 根DOM
+        this.fragment = this.nodeToFragment(this.el); // 删除原始DOM, 生成新的虚拟DOM树
+        this.compileElement(this.fragment); // 编译DOM节点特殊字符
+        this.el.appendChild(this.fragment); // 把虚拟DOM添加到真正的DOM上
+        // 解析DOM->初始化->编译(绑定订阅器)
+    }
+
+    // 2. 给Compile实例对象扩展方法
+    Compile.prototype = {
+        // 用于生成虚拟DOM
+        nodeToFragment(el) {
+            // createDocumentFragment() 创建DOM节点, 但它不是主DOM节点一部分, 一般用法是将子元素添加到这个DOM上, 然后将DOM添加到真正的主DOM上, 因为这个创建的DOM是在内存中的.
+            let fragment = document.createDocumentFragment();
+            // 获取根节点的第一个孩子节点
+            let child = el.firstChild;
+            // 递归查找所有子节点, 并且挂载到虚拟DOM上
+            while (child) {
+                // 将DOM元素移入fragment中, 重点注意: 如果使用appendChid方法将原dom树中的节点添加到DocumentFragment中时，会删除原来的节点。
+                fragment.appendChild(child);
+                // 所以这里获取el下的第一个孩子, 不会一直指向一个标签
+                child = el.firstChild;
+            }
+            // 返回虚拟DOM
+            return fragment;
+        },
+        // 3. 解析虚拟DOM节点夹着的值
+        compileElement(el) {
+            let childNodes = el.childNodes;
+            let self = this;
+            // 遍历每个DOM节点
+            [].slice.call(childNodes).forEach(function (node) {
+                let reg = /\{\{(.*)\}\}/;
+                let text = node.textContent;
+                if (self.isTextNode(node) && reg.test(text)) {
+                    // 判断节点是否有内容, 而且内容是否是{{}}这种格式的
+                    // reg.exec(text) 提取{{}}和里面内容, 就是属性key值
+                    // 4. 注册文本节点监听器(并初始化值)
+                    self.compileText(node, reg.exec(text)[1]);
+                }
+                // 判断是否还有子节点, 如果有则继续递归子节点
+                if (node.childNodes && node.childNodes.length) {
+                    self.compileElement(node);
+                }
+            })
+        },
+        // 5. 节点监视器
+        compileText(node, exp) {
+            let self = this;
+            let initText = this.vm[exp];
+            self.updateText(node, initText);
+            // 6. 给节点新建个监视器, 监视key的变化, 变化就会回调这个function
+            new Watcher(this.vm, function (val) {
+                self.updateText(node, val);
+            }, exp);
+        },
+        // 7. 更新某个节点的值
+        updateText(node, value) {
+            node.textContent = typeof value === 'undefined' ? '' : value;
+        },
+        // 判断是否是文本节点
+        isTextNode: function (node) {
+            return node.nodeType == 3;
+        }
+    };
+
+    function Vue(options, exp){
+        this.data = options.data();
+        let self = this;
+        Object.keys(this.data).forEach(function(key){
+            self.proxyKeys(key);
+        });
+        observe(this.data);
+        // 8. 操作DOM部分交给Compile处理
+        new Compile(options.el, this);
+        // 9. 给Vue挂载mounted方法
+        options.mounted.call(this);
+    }
+
+    Vue.prototype = {
+        proxyKeys: function(key){
+            let self = this;
+            Object.defineProperty(this, key, {
+                get: function(){
+                    return self.data[key];
+                },
+                set: function(newVal){
+                    self.data[key] = newVal
+                }
+            })
+        }
+    }
+</script>
+<div id="app">{{userName}}</div>
+<script>
+    new Vue({
+        el: "#app",
+        data () {
+            return {
+                "userName": "hello VueJS"
+            }
+        },
+        // 10. 使用mounted方法
+        mounted () {
+            setTimeout(()=>{
+                this.userName = "漂亮";
+            }, 2000);
+        }
+    });
+</script>
+</body>
+</html>

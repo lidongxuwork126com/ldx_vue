@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+<div id="app">
+    <h1>{{userName}}</h1>
+    <input type="text" v-model="userName">
+    <!--1. 使用v-on绑定click事件 -->
+    <button v-on:click="btn">点我试试</button>
+</div>
+<!--注意引用顺序-->
+<script src="js/Observe.js"></script>
+<script src="js/Dep.js"></script>
+<script src="js/Watcher.js"></script>
+<script src="js/Compile.js"></script>
+<script src="js/Vue.js"></script>
+<script>
+    new Vue({
+        el: "#app",
+        data() {
+            return {
+                "userName": "hello VueJS"
+            }
+        },
+        mounted() {
+            setTimeout(() => {
+                this.userName = "漂亮";
+            }, 2000);
+        },
+        // 2. 注册methods
+        methods: {
+            btn() {
+                this.userName = "点按钮了";
+            }
+        }
+    });
+</script>
+</body>
+</html>

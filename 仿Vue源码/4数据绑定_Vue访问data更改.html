@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+<script>
+    function myObjectDefinePropery(data, key, val) {
+        if (val && typeof val === 'object') {
+            observe(val);
+            return;
+        }
+        let dep = new Dep();
+        Object.defineProperty(data, key, {
+            get: function() {
+                if (Dep.target){
+                    dep.addSub(Dep.target);
+                }
+                return val;
+            },
+            set: function(newVal) {
+                if (val === newVal){
+                    return;
+                }
+                val = newVal;
+                dep.notify();
+            }
+        });
+    }
+    function observe(data) {
+        Object.keys(data).forEach(function(key) {
+            myObjectDefinePropery(data, key, data[key]);
+        });
+    }
+    function Dep () {
+        this.watcherArr = [];
+    }
+    Dep.prototype = {
+        addSub: function(watcher){
+            this.watcherArr.push(watcher);
+        },
+        notify: function(){
+            this.watcherArr.forEach(function(watcher){
+                watcher.update();
+            })
+        }
+    };
+    function Watcher(vm, cb, exp) {
+        this.vm = vm;
+        this.cb = cb;
+        this.exp = exp;
+        this.value = this.get();
+    }
+    Watcher.prototype = {
+        update: function() {
+            let value = this.vm.data[this.exp];
+            let oldVal = this.value;
+            if (value !== oldVal) {
+                this.value = value;
+                this.cb.call(this.vm, value);
+            }
+        },
+        get: function() {
+            Dep.target = this;
+            let value = this.vm.data[this.exp];
+            Dep.target = null;
+            return value;
+        }
+    };
+    function Vue(options, exp){
+        this.data = options.data();
+        let el = document.querySelector(options['el']);
+
+        // 2. 给获取到的data下的属性, 每个key都调用代理proxyKeys, 绑定set/get方法, 使用get方法直接从data属性下去取
+        let self = this;
+        Object.keys(this.data).forEach(function(key){
+            self.proxyKeys(key);
+        });
+
+        observe(this.data);
+        el.innerHTML = this.data[exp];
+        new Watcher(this, function(value){
+            el.innerHTML = value;
+        }, exp);
+        return this;
+    }
+    // 1. 给Vue扩展proxyKeys, key值代理
+    Vue.prototype = {
+        proxyKeys: function(key){
+            let self = this;
+            Object.defineProperty(this, key, {
+                get: function(){
+                    return self.data[key];
+                },
+                set: function(newVal){
+                    self.data[key] = newVal
+                }
+            })
+        }
+    }
+</script>
+<div id="app">{{userName}}</div>
+<script>
+    let app = new Vue({
+        el: "#app",
+        data () {
+            return {
+                "userName": "hello VueJS"
+            }
+        }
+    }, "userName");
+
+    setTimeout(()=>{
+        // 3. 使用方式修改一下
+        app.userName = "漂亮";
+    }, 2000);
+</script>
+</body>
+</html>

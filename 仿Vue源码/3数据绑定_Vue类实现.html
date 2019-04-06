@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+<script>
+    function myObjectDefinePropery(data, key, val) {
+        if (val && typeof val === 'object') {
+            observe(val);
+            return;
+        }
+        let dep = new Dep();
+        Object.defineProperty(data, key, {
+            get: function() {
+                if (Dep.target){
+                    dep.addSub(Dep.target);
+                }
+                return val;
+            },
+            set: function(newVal) {
+                if (val === newVal){
+                    return;
+                }
+                val = newVal;
+                dep.notify();
+            }
+        });
+    }
+    function observe(data) {
+        Object.keys(data).forEach(function(key) {
+            myObjectDefinePropery(data, key, data[key]);
+        });
+    }
+    function Dep () {
+        this.watcherArr = [];
+    }
+    Dep.prototype = {
+        addSub: function(watcher){
+            this.watcherArr.push(watcher);
+        },
+        notify: function(){
+            this.watcherArr.forEach(function(watcher){
+                watcher.update();
+            })
+        }
+    };
+
+    // 1. 修改观察者, 接收参数
+    function Watcher(vm, cb, exp) {
+        this.vm = vm; // 虚拟DOM对象(vue实例对象)
+        this.cb = cb; // 对应执行的function方法体
+        this.exp = exp; // 监听哪个属性
+        this.value = this.get();  // 调用一下下面的get方法, 把watcher对象提交到Dep订阅者中
+    }
+
+    Watcher.prototype = {
+        // 2. 修改update方法, 触发后把新值回调给new Watcher的地方
+        update: function() {
+            // 拿到vue的data中的key对应的value
+            let value = this.vm.data[this.exp];
+            // 获取原有的value值
+            let oldVal = this.value;
+            if (value !== oldVal) {
+                // 把新值更新一下
+                this.value = value;
+                // 值不同, 则调用Watcher执行, 把新的值传过去
+                this.cb.call(this.vm, value);
+            }
+        },
+        get: function() {
+            Dep.target = this;
+            // 强制执行Object.defineProperty里的get方法, 把观察者添加到Dep订阅者数组中
+            let value = this.vm.data[this.exp];
+            Dep.target = null;
+            return value;
+        }
+    };
+
+
+    // 3. 定义Vue类, 接收参数和监听的key (注意暂时这里只能接收一个key)
+    function Vue (options, exp){
+        // 获取data对象
+        this.data = options.data();
+        // 获取el根节点
+        let el = document.querySelector(options['el']);
+        // 触发Observer监听data里所有key
+        observe(this.data);
+        // 初始化模板数据的值
+        el.innerHTML = this.data[exp];
+        // 实例化Watcher, 传入Vue实例对象, 以及回调函数, 还有要触发监听的key值
+        // 4. Watcher执行, 更新el节点里的值
+        new Watcher(this, function(value){
+            el.innerHTML = value;
+        }, exp);
+        // 5. 返回Vue实例对象
+        return this;
+    }
+
+</script>
+<div id="app">{{userName}}</div>
+<script>
+    // 6. 仿照Vue定义, 传入需要的参数
+    let app = new Vue({
+        el: "#app",
+        data () {
+            return {
+                "userName": "hello VueJS"
+            }
+        }
+    }, "userName");
+
+    setTimeout(()=>{
+        app.data.userName = "漂亮";
+    }, 2000);
+
+    // 这时, 我们发现雏形已经出来了, 但是还有点不一样, 但是我们在控制台修改app.data.userName 确实实现了数据的绑定, 页面发生了变化.
+</script>
+</body>
+</html>
